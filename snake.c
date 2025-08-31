@@ -89,23 +89,29 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 void print_board(unsigned char (*board)[WIDTH]) {
-    putchar(0xc9);
-    for (int i = 0; i < WIDTH; ++i)
-        putchar(0xcd);
-    putchar(0xbb);
-    putchar('\n');
-    for (int i = 0; i < HEIGHT; ++i) {
-        putchar(0xba);
-        for (int j = 0; j < WIDTH; ++j)
-            putchar(board[i][j]);
-        putchar(0xba);
-        putchar('\n');
-    }
-    putchar(0xc8);
-    for (int i = 0; i < WIDTH; ++i)
-        putchar(0xcd);
-    putchar(0xbc);
-    putchar('\n');
+    printf("\e[38;5;247m\e[48;5;22m%c", 0xc9);
+	for (int i = 0; i < WIDTH; i++)
+		printf("%c", 0xcd);
+	printf("%c\n", 0xbb);
+
+    for (int i = 0; i < HEIGHT; i++) {
+		printf("%c", 0xba);
+		for (int j = 0; j < WIDTH; j++) {
+			if (board[i][j] == SNEK_SEGMENT) {
+                printf("\e[38;5;220m%c\e[38;5;247m", SNEK_SEGMENT);
+            } else if (board[i][j] == FOOD) {
+				printf("\e[38;5;16m%c\e[38;5;247m", FOOD);
+            } else {
+				printf(" ");
+            }
+		}
+		printf("%c\n", 0xba);
+	}
+
+	printf("%c", 0xc8);
+    for (int i = 0; i < WIDTH; i++)
+            printf("%c", 0xcd);
+    printf("%c\e[0m\n", 0xbc);
 }
 bool move_snek(SNEK* head, short row_nxt, short col_nxt, bool isfood) {
     SNEK *seg_ptr = head;

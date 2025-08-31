@@ -99,28 +99,29 @@ int main(int argc, char *argv[]) {
 }
 
 void print_board(char board[HEIGHT][WIDTH]) {
-	printf("╔");
+	printf("\e[38;5;247m\e[48;5;22m╔");
 	for (int i = 0; i < WIDTH; i++)
 		printf("═");
 	printf("╗\n");
 
-	for (int i = 0; i < HEIGHT; i++) {
+    for (int i = 0; i < HEIGHT; i++) {
 		printf("║");
 		for (int j = 0; j < WIDTH; j++) {
-			if (board[i][j] == 1)
-				printf("█");
-			else if (board[i][j] == 2)
-				printf("■");
-			else
+			if (board[i][j] == 1) {
+                printf("\e[38;5;220m⬤\e[38;5;247m");
+            } else if (board[i][j] == 2) {
+				printf("\e[38;5;16m■\e[38;5;247m");
+            } else {
 				printf(" ");
+            }
 		}
 		printf("║\n");
 	}
 
 	printf("╚");
-        for (int i = 0; i < WIDTH; i++)
-                printf("═");
-        printf("╝\n");
+    for (int i = 0; i < WIDTH; i++)
+            printf("═");
+    printf("╝\e[0m\n");
 }
 
 bool move_snek(snek* head, short row_nxt, short col_nxt, bool isfood) {
