@@ -6,10 +6,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#define HEIGHT 30
-#define WIDTH 60
-#define SNEK_SEGMENT 1
-#define FOOD 2
+#define HEIGHT  20
+#define WIDTH   40
+#define FOOD    7
 
 typedef struct snake {
 	short row;
@@ -22,24 +21,24 @@ void print_board(char board[HEIGHT][WIDTH]);
 char wait_for_keypress(double milliseconds, char current_dir);
 bool move_snek(snek* head, short row_nxt, short col_nxt, bool isfood);
 void get_food_pos(short *pos_row, short *pos_col, char board[HEIGHT][WIDTH]);
-void create_frame(snek *head, short *food_pos_row, short *food_pos_col, char board[HEIGHT][WIDTH]);
+void create_frame(snek *head, char curr_dir, short *food_pos_row, short *food_pos_col, char board[HEIGHT][WIDTH]);
 
 int main(int argc, char *argv[]) {
 	struct termios old_tio, new_tio;
 	tcgetattr(STDIN_FILENO, &old_tio);
-	
+
 	new_tio = old_tio;
 	new_tio.c_lflag &= (~ICANON & ~ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
-	
+
 	int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
 	fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
 
 	char board[HEIGHT][WIDTH];
 	snek *head = (snek *) malloc(sizeof(snek));
 	snek *tail = (snek *) malloc(sizeof(snek));
-	head->row = 14, head->col = 29, head->next = tail;
-	tail->row = 14, tail->col = 28, tail->next = NULL;
+	head->row = HEIGHT / 2 - 1, head->col = WIDTH / 2 - 1, head->next = tail;
+	tail->row = HEIGHT / 2 - 1, tail->col = WIDTH / 2 - 2, tail->next = NULL;
 
 	int snek_len = 2;
     char curr_dir = 'r';
@@ -48,16 +47,12 @@ int main(int argc, char *argv[]) {
 
 	srand(time(NULL));
     get_food_pos(&food_pos_row, &food_pos_col, board);
-    create_frame(head, &food_pos_row, &food_pos_col, board);
+    create_frame(head, curr_dir, &food_pos_row, &food_pos_col, board);
 	printf("\e[1;1H\e[2J");
 	print_board(board);
 	
 	while (true) {
         curr_dir = wait_for_keypress(75, curr_dir);
-        /*if (!curr_dir) {
-            printf("RSHIFT pressed. Aborting.\n");
-            break;
-        }*/
         bool collision;
         switch (curr_dir) {
             case 'l':
@@ -78,7 +73,7 @@ int main(int argc, char *argv[]) {
             if (head->row == food_pos_row && head->col == food_pos_col) {
                 ++snek_len;
             }
-            create_frame(head, &food_pos_row, &food_pos_col, board);
+            create_frame(head, curr_dir, &food_pos_row, &food_pos_col, board);
             print_board(board);
             printf("snake length = %d\n", snek_len);
             if (snek_len == HEIGHT * WIDTH) {
@@ -99,23 +94,45 @@ int main(int argc, char *argv[]) {
 }
 
 void print_board(char board[HEIGHT][WIDTH]) {
-	printf("\e[38;5;247m\e[48;5;22m╔");
+	printf("\e[38;5;247m\e[48;5;242m╔");
 	for (int i = 0; i < WIDTH; i++)
 		printf("═");
 	printf("╗\n");
 
+    char *colors[] = {"\e[38;5;21m", "\e[38;5;51m"};
+    char *bgcols[] = {"\e[48;5;22m", "\e[48;5;64m"};
     for (int i = 0; i < HEIGHT; i++) {
 		printf("║");
 		for (int j = 0; j < WIDTH; j++) {
-			if (board[i][j] == 1) {
-                printf("\e[38;5;220m⬤\e[38;5;247m");
-            } else if (board[i][j] == 2) {
-				printf("\e[38;5;16m■\e[38;5;247m");
-            } else {
-				printf(" ");
+            printf("%s", bgcols[(i+j)%2]);
+			switch (board[i][j] & 0xf) {
+                case 0:
+                    printf(" ");
+                    break;
+                case 0x1:
+                    printf("%s━", colors[(board[i][j] & 0x10) >> 4]);
+                    break;
+                case 0x2:
+                    printf("%s┃", colors[(board[i][j] & 0x10) >> 4]);
+                    break;
+                case 0x3:
+                    printf("%s┛", colors[(board[i][j] & 0x10) >> 4]);
+                    break;
+                case 0x4:
+                    printf("%s┗", colors[(board[i][j] & 0x10) >> 4]);
+                    break;
+                case 0x5:
+                    printf("%s┏", colors[(board[i][j] & 0x10) >> 4]);
+                    break;
+                case 0x6:
+                    printf("%s┓", colors[(board[i][j] & 0x10) >> 4]);
+                    break;
+                case 0x7:
+                    printf("\e[38;5;220m■");
+                    break;
             }
 		}
-		printf("║\n");
+		printf("\e[38;5;247m\e[48;5;242m║\n");
 	}
 
 	printf("╚");
@@ -188,17 +205,51 @@ char wait_for_keypress(double milliseconds, char current_dir) {
     return new_dir;
 }
 
-void create_frame(snek *head, short *food_pos_row, short *food_pos_col, char board[HEIGHT][WIDTH]) {
-	for (int i = 0; i < HEIGHT; ++i)
+void create_frame(snek *head, char curr_dir, short *food_pos_row, short *food_pos_col, char board[HEIGHT][WIDTH]) {
+    for (int i = 0; i < HEIGHT; ++i)
         for (int j = 0; j < WIDTH; ++j)
-            board[i][j] = ' ';
+            board[i][j] = 0;
+    
+    snek *prev = NULL;
+    int alt = 0x10;
     while (head) {
-        board[head->row][head->col] = SNEK_SEGMENT;
+        if (!prev) {
+            if (curr_dir == 'l' || curr_dir == 'r')
+                board[head->row][head->col] = 0x1; // ═
+            else
+                board[head->row][head->col] = 0x2; // ║
+        } else if (!head->next) {
+            if (head->row != prev->row)
+                board[head->row][head->col] = 0x2;
+            else
+                board[head->row][head->col] = 0x1;
+        } else {
+            int vr1 = prev->row - head->row;
+            int vc1 = prev->col - head->col;
+            int vr2 = head->row - head->next->row;
+            int vc2 = head->col - head->next->col;
+            if (vr1 == 0 && vr2 == 0)
+                board[head->row][head->col] = 0x1;
+            else if (vc1 == 0 && vc2 == 0)
+                board[head->row][head->col] = 0x2;
+            else if (vr1 == -1 && vc2 == 1 || vc1 == -1 && vr2 == 1)
+                board[head->row][head->col] = 0x3; // ╝
+            else if (vr1 == -1 && vc2 == -1 || vc1 == 1 && vr2 == 1)
+                board[head->row][head->col] = 0x4; // ╚
+            else if (vc1 == 1 && vr2 == -1 || vr1 == 1 && vc2 == -1)
+                board[head->row][head->col] = 0x5; // ╔
+            else if (vc1 == -1 && vr2 == -1 || vr1 == 1 && vc2 == 1)
+                board[head->row][head->col] = 0x6; // ╗
+        }
+        board[head->row][head->col] |= alt;
+        alt ^= 0x10;
+        prev = head;
         head = head->next;
     }
-    if (board[*food_pos_row][*food_pos_col] == SNEK_SEGMENT)
+    
+    if ((board[*food_pos_row][*food_pos_col] & 0xf) < 7 && (board[*food_pos_row][*food_pos_col] & 0xf) > 0)
         get_food_pos(food_pos_row, food_pos_col, board);
-    board[*food_pos_row][*food_pos_col] = FOOD;
+    board[*food_pos_row][*food_pos_col] = 0x7;
 }
 
 void free_snek(snek *head) {
@@ -213,5 +264,5 @@ void get_food_pos(short *pos_row, short *pos_col, char board[HEIGHT][WIDTH]) {
     do {
         *pos_row = rand()%HEIGHT;
         *pos_col = rand()%WIDTH;
-    } while (board[*pos_row][*pos_col] == SNEK_SEGMENT);
+    } while ((board[*pos_row][*pos_col] & 0xf) < 7 && (board[*pos_row][*pos_col] & 0xf) > 0);
 }
